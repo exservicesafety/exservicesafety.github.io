@@ -136,15 +136,15 @@
       if (!res.ok) return handleAuthError(res);
       state.user = res.user; state.home = res; setWho();
       if (!res.user.consented) return go('/consent');
-      var rec = res.options.filter(function (o) { return o.name === res.recommended; })[0];
-      var main;
-      if (rec && rec.done) {
-        main = '<a class="home-btn done" href="#/record/' + esc(rec.done.no) + '"><span class="ico">✔️</span><span>' +
-          esc(fmtDate(rec.workDate)) + ' ' + esc(rec.name) + ' TBM 완료<small>' + esc(rec.done.submittedAt.slice(11, 16)) +
-          ' 제출 · 눌러서 내용 보기</small></span></a><a class="sub-link" href="#/tbm">다른 교대조 TBM 참여 ›</a>';
+      // TBM은 주 1회: 이번 주에 냈으면 완료 표시, 아니면 참여 버튼
+      var main, wd = res.weekDone;
+      if (wd) {
+        main = '<a class="home-btn done" href="#/record/' + esc(wd.no) + '"><span class="ico">✔️</span><span>이번 주 TBM 완료<small>' +
+          esc(fmtDate(wd.workDate)) + ' ' + esc(wd.shift) + ' · ' + esc(wd.submittedAt.slice(11, 16)) + ' 제출 · 눌러서 내용 보기</small></span></a>' +
+          '<p class="hint" style="text-align:center;margin:-4px 0 0">이번 주 ' + esc(res.weekLabel) + ' · 다음 주 월요일부터 다시 참여합니다</p>';
       } else {
-        main = '<a class="home-btn main" href="#/tbm"><span class="ico">✅</span><span>오늘 TBM 참여<small>' +
-          (rec ? '지금은 ' + esc(rec.name) + '(' + esc(rec.start) + ' 시작) 차례입니다' : '') + '</small></span></a>';
+        main = '<a class="home-btn main" href="#/tbm"><span class="ico">✅</span><span>이번 주 TBM 참여<small>' +
+          esc(res.weekLabel) + ' · 아직 참여하지 않았습니다</small></span></a>';
       }
       var recent = res.recent.length ? '<div class="card" style="margin:0;padding:14px 18px"><b style="font-size:16px">최근 제출</b><ul class="recent">' +
         res.recent.map(function (r) { return '<li>' + esc(fmtDate(r.workDate)) + ' ' + esc(r.shift) + ' · ' + esc(r.submittedAt.slice(11, 16)) + (r.late ? ' (지연)' : '') + '</li>'; }).join('') +
@@ -166,6 +166,28 @@
     view('<div class="card"><h1>연결 오류</h1><p>' + esc(res.error) + '</p><button class="btn" onclick="location.reload()">다시 시도</button></div>');
   }
 
+  // 공지 내용: 인터넷 주소는 누를 수 있는 링크로, 유튜브 주소는 화면 안에서 바로 재생되는 영상으로 보여 준다
+  function youtubeId(url) {
+    var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/);
+    return m ? m[1] : null;
+  }
+  function richText(text) {
+    var out = '', videos = [], last = 0, re = /https?:\/\/[^\s<>"']+/g, m;
+    text = String(text || '');
+    while ((m = re.exec(text))) {
+      var url = m[0].replace(/[).,]+$/, ''), vid = youtubeId(url);
+      out += esc(text.slice(last, m.index));
+      out += '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + (vid ? '▶ 영상 새 창으로 보기' : '🔗 ' + esc(url)) + '</a>';
+      if (vid && videos.indexOf(vid) < 0) videos.push(vid);
+      last = m.index + url.length;
+    }
+    out += esc(text.slice(last));
+    return out + videos.map(function (v) {
+      return '<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/' + v + '?rel=0&playsinline=1" title="동영상" ' +
+        'allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>';
+    }).join('');
+  }
+
   function fmtDate(ymd) {
     var p = String(ymd).split('-').map(Number);
     var d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
@@ -177,8 +199,14 @@
     api('home').then(function (res) {
       if (!res.ok) return handleAuthError(res);
       state.home = res; state.user = res.user; setWho();
-      var html = '<h1>어느 교대조인가요?</h1><p class="hint" style="margin-top:-4px">지금 ' + esc(res.now.slice(11, 16)) +
-        ' · 가장 가까운 교대조를 골라 두었습니다.</p><form id="f">';
+      if (res.weekDone) {
+        return view('<div class="card" style="text-align:center"><h1>이번 주 TBM 완료</h1><p>' + esc(res.weekLabel) + ' TBM은<br>' +
+          esc(fmtDate(res.weekDone.workDate)) + ' ' + esc(res.weekDone.shift) + '에 이미 제출했습니다.</p>' +
+          '<p class="hint">TBM은 주 1회입니다. 다음 주 월요일부터 다시 참여할 수 있습니다.</p></div>' +
+          '<a class="btn" href="#/record/' + esc(res.weekDone.no) + '">제출 내용 보기</a><a class="btn ghost" href="#/home">홈으로</a>');
+      }
+      var html = '<h1>어느 교대조인가요?</h1><p class="hint" style="margin-top:-4px">이번 주 ' + esc(res.weekLabel) + ' · 지금 ' + esc(res.now.slice(11, 16)) +
+        '<br>가장 가까운 교대조를 골라 두었습니다.</p><form id="f">';
       res.options.forEach(function (o) {
         var tag = o.done ? '<span class="tag fin">제출 완료 ' + esc(o.done.submittedAt.slice(11, 16)) + '</span>'
           : o.name === res.recommended ? '<span class="tag rec">추천</span>' : o.late ? '<span class="tag late">마감 지남</span>' : '';
@@ -225,7 +253,7 @@
 
     if (st.kind === 'notice') {
       var n = st.notice;
-      body = '<h2>📢 필독 공지</h2><div class="card notice-step"><h2>' + esc(n.title) + '</h2><div class="notice-body">' + esc(n.body) + '</div>' +
+      body = '<h2>📢 필독 공지</h2><div class="card notice-step"><h2>' + esc(n.title) + '</h2><div class="notice-body">' + richText(n.body) + '</div>' +
         n.images.map(function (id) { return '<img class="notice-img" data-img="' + esc(id) + '" alt="공지 이미지">'; }).join('') + '</div>';
       nextLabel = '확인했습니다';
     } else if (st.kind === 'health') {
@@ -385,7 +413,7 @@
       if (!res.ok) return go('/notices');
       var n = res.notice;
       view('<div class="card">' + (n.mustRead ? '<span class="badge b-bad">필독</span>' : '') + '<h1 style="margin-top:8px">' + esc(n.title) + '</h1>' +
-        '<p class="muted" style="margin-top:-6px;font-size:14px">' + esc(n.posted) + '</p><div class="notice-body">' + esc(n.body) + '</div>' +
+        '<p class="muted" style="margin-top:-6px;font-size:14px">' + esc(n.posted) + '</p><div class="notice-body">' + richText(n.body) + '</div>' +
         n.images.map(function (fid) { return '<img class="notice-img" data-img="' + esc(fid) + '" alt="공지 이미지">'; }).join('') +
         '</div><a class="btn" href="#/notices">목록으로</a>');
       loadImages(app);

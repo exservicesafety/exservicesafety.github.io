@@ -130,3 +130,8 @@ input:focus, select:focus, textarea:focus { outline: 3px solid rgba(31,78,121,.2
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 30; max-width: 520px; margin: 0 auto;
   background: #a50e0e; color: #fff; border-radius: 12px; padding: 14px 16px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.2); }
 .toast.ok { background: #0d652d; }
+
+/* 공지 동영상 (16:9) */
+.video { position: relative; width: 100%; padding-top: 56.25%; margin-top: 12px; border-radius: 10px; overflow: hidden; background: #000; }
+.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.notice-body a { font-weight: 700; word-break: break-all; }
