@@ -136,3 +136,16 @@ input:focus, select:focus, textarea:focus { outline: 3px solid rgba(42,103,182,.
 .video { position: relative; width: 100%; padding-top: 56.25%; margin-top: 12px; border-radius: 10px; overflow: hidden; background: #000; }
 .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .notice-body a { font-weight: 700; word-break: break-all; }
+
+/* 삼성 인터넷은 휴대폰이 다크 모드면 웹페이지를 강제로 어둡게 바꾼다.
+   사이트가 자체 다크 모드(prefers-color-scheme: dark)를 갖고 있으면 강제 변환을 하지 않으므로,
+   다크 모드용 규칙을 두되 값은 밝은 화면 그대로 유지한다. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --header: #213b62; --navy: #2a67b6; --navy-dark: #1f4f8f;
+    --bg: #f3f6fb; --card: #fff; --text: #192d4b; --muted: #5f6b7a; --line: #cfd9e6; --field: #f5f9fc;
+    color-scheme: only light;
+  }
+  html, body { background: var(--bg); color: var(--text); }
+  .card, .q, .home-btn { background: var(--card); color: var(--text); }
+}
