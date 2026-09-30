@@ -1,6 +1,6 @@
 // 오프라인 대비: 화면 파일만 저장해 둔다 (제출 데이터는 저장하지 않음, 항상 서버로 보냄).
 // 화면을 고친 뒤에는 VERSION 숫자를 올려야 근무자 휴대폰에 새 화면이 반영된다.
-const VERSION = 'tbm-v2';
+const VERSION = 'tbm-v3';
 const FILES = ['./', './index.html', './app.js', './style.css', './config.js', './manifest.json', './icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
