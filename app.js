@@ -97,8 +97,9 @@
       var v = $('#emp').value.trim();
       if (!v) return;
       setEmpNo(v);
-      api('login').then(function (res) {
-        if (!res.ok) { setEmpNo(''); return; }
+      api('login', null, { keepError: true }).then(function (res) {
+        if (!res.ok && notOpen(res)) return screenNotOpen(res.error);
+        if (!res.ok) { toast(res.error || '오류가 났습니다.'); setEmpNo(''); return; }
         view('<div class="card" style="text-align:center"><h1>본인이 맞나요?</h1>' +
           '<p style="font-size:22px;margin:8px 0"><b>' + esc(res.user.name) + '</b>님</p>' +
           '<p class="muted" style="margin:0">' + esc(res.user.office) + ' · 사번 ' + esc(res.user.empNo) + '</p>' +
@@ -160,7 +161,18 @@
     });
   }
 
+  // 운영 시작일 전: 사번은 그대로 두고 안내만 보여 준다
+  function notOpen(res) { return /부터 사용할 수 있습니다/.test(res.error || ''); }
+  function screenNotOpen(msg) {
+    view('<div class="card" style="text-align:center"><div style="font-size:54px;line-height:1">⏳</div><h1 style="margin-top:12px">아직 시작 전입니다</h1>' +
+      '<p style="font-size:20px;margin:8px 0"><b>' + esc(msg) + '</b></p>' +
+      '<p class="hint">바탕화면 아이콘은 지금 미리 만들어 두셔도 됩니다.<br>시작하는 날 아이콘을 누르면 바로 들어갈 수 있습니다.</p></div>' +
+      '<button class="btn ghost" id="again">다른 사번으로 바꾸기</button>');
+    $('#again').onclick = function () { setEmpNo(''); screenLogin(); };
+  }
+
   function handleAuthError(res) {
+    if (notOpen(res)) return screenNotOpen(res.error);
     if (/등록되지 않은|중지된|비어 있/.test(res.error || '')) { toast(res.error); setEmpNo(''); return go('/login'); }
     if (/동의가 필요/.test(res.error || '')) return go('/consent');
     view('<div class="card"><h1>연결 오류</h1><p>' + esc(res.error) + '</p><button class="btn" onclick="location.reload()">다시 시도</button></div>');
