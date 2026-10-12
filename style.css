@@ -25,7 +25,7 @@ h1 { font-size: 24px; } h2 { font-size: 20px; }
 
 .card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 16px; }
 label.lb { display: block; font-weight: 700; margin: 16px 0 6px; }
-input[type=text], input[type=tel], input[type=datetime-local], select, textarea {
+input[type=text], input[type=tel], input[type=password], input[type=datetime-local], select, textarea {
   width: 100%; font: inherit; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--field); min-height: 54px;
 }
 textarea { min-height: 90px; }
@@ -136,6 +136,38 @@ input:focus, select:focus, textarea:focus { outline: 3px solid rgba(42,103,182,.
 .video { position: relative; width: 100%; padding-top: 56.25%; margin-top: 12px; border-radius: 10px; overflow: hidden; background: #000; }
 .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .notice-body a { font-weight: 700; word-break: break-all; }
+
+
+/* 관리자 화면 */
+.adm-title h1 { margin-bottom: 2px; } .adm-title p { margin: 0 0 14px; }
+.ring-card { display: flex; align-items: center; gap: 16px; text-decoration: none; color: var(--text); }
+.ring { --p: 0; flex: none; width: 92px; height: 92px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: conic-gradient(var(--navy) calc(var(--p) * 1%), #dde3ea 0); }
+.ring span { width: 70px; height: 70px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 19px; }
+.chev { font-size: 30px; color: var(--muted); line-height: 1; }
+select.wk { margin-bottom: 14px; font-size: 18px; }
+.stat-dark { display: flex; justify-content: space-between; gap: 12px; background: var(--header); color: #fff; border-radius: var(--radius); padding: 20px; margin-bottom: 12px; }
+.stat-dark .lbl { font-size: 15px; opacity: .85; }
+.stat-dark .big { font-size: 46px; font-weight: 800; line-height: 1.1; }
+.stat-dark .mid { font-size: 28px; font-weight: 800; margin-top: 6px; }
+.stat-dark .sub { font-size: 15px; opacity: .85; margin-top: 4px; }
+.bands { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.bands span { font-size: 14px; font-weight: 700; padding: 6px 10px; border-radius: 10px; }
+.bands .r { background: #fce8e6; color: #a50e0e; } .bands .y { background: #fef7e0; color: #8a5300; } .bands .g { background: #e6f4ea; color: #0d652d; }
+.row-link { display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: var(--text); font-size: 19px; }
+.row-link > span { display: flex; align-items: center; gap: 10px; }
+.pill { background: #e7ecf2; border-radius: 10px; padding: 3px 12px; font-weight: 800; font-size: 16px; }
+.list-head { display: flex; justify-content: space-between; align-items: center; margin: 6px 2px 10px; font-size: 18px; }
+.seg { display: flex; background: #e1e7ef; border-radius: 12px; padding: 3px; }
+.seg button { font: inherit; font-size: 15px; font-weight: 700; border: 0; background: transparent; color: var(--muted); padding: 7px 14px; border-radius: 10px; }
+.seg button.on { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.off-row { display: block; padding: 14px 0; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--text); }
+.off-row:last-child { border-bottom: 0; }
+.off-top { display: flex; justify-content: space-between; font-size: 18px; }
+.pc.r { color: #c5221f; } .pc.y { color: #b06000; } .pc.g { color: #1e8e3e; }
+.bar { height: 8px; background: #e1e7ef; border-radius: 6px; overflow: hidden; margin: 8px 0 6px; }
+.bar > div { height: 100%; border-radius: 6px; }
+.bar .r { background: #e57368; } .bar .y { background: #f2b33d; } .bar .g { background: #34a853; }
 
 /* 삼성 인터넷은 휴대폰이 다크 모드면 웹페이지를 강제로 어둡게 바꾼다.
    사이트가 자체 다크 모드(prefers-color-scheme: dark)를 갖고 있으면 강제 변환을 하지 않으므로,

@@ -1,13 +1,14 @@
 /* 「고속도로 영업소 TBM」 휴대폰 화면
  * - 서버: 구글 시트 Apps Script 웹 앱 (config.js의 API_URL)
- * - 로그인: 사번만 입력 → 이름 확인 → 이 휴대폰에 기억
+ * - 로그인: 사번 + 비밀번호(처음엔 사번과 같음 → 첫 로그인 때 변경) → 이 휴대폰에 로그인 유지
+ * - 관리자([근무자] 탭 권한=관리자): TBM 대신 권역 현황 화면
  * - 화면 주소: #/home, #/tbm, #/records, #/notices, #/report ...
  */
 (function () {
   'use strict';
   var CFG = window.TBM_CONFIG || {};
   var app = document.getElementById('app');
-  var KEY = 'tbm_emp_no';
+  var KEY = 'tbm_emp_no', TKEY = 'tbm_token';
   var state = { user: null, home: null, flow: null };
 
   // ---------------- 공통 도구 ----------------
@@ -21,6 +22,9 @@
   function go(path) { if (location.hash === '#' + path) route(); else location.hash = path; }
   function empNo() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return state.empNo || ''; } }
   function setEmpNo(v) { state.empNo = v; try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) {} }
+  function token() { try { return localStorage.getItem(TKEY) || state.token || ''; } catch (e) { return state.token || ''; } }
+  function setToken(v) { state.token = v; try { if (v) localStorage.setItem(TKEY, v); else localStorage.removeItem(TKEY); } catch (e) {} }
+  function logout() { setToken(''); state.user = null; state.home = null; go('/login'); }
   function loading(on, text) {
     $('#loading').hidden = !on;
     $('#loadingText').textContent = text || '잠시만 기다려 주세요';
@@ -40,7 +44,7 @@
   // 서버 호출: 동시 접속이 몰려 실패하면 최대 3번까지 다시 시도
   function api(action, data, opts) {
     opts = opts || {};
-    var body = JSON.stringify(Object.assign({ action: action, empNo: empNo() }, data || {}));
+    var body = JSON.stringify(Object.assign({ action: action, token: token() }, data || {}));
     if (!opts.silent) loading(true, opts.text);
     var tries = 0;
     function attempt() {
@@ -68,6 +72,8 @@
     '/login': screenLogin, '/consent': screenConsent, '/home': screenHome, '/tbm': screenSelect,
     '/check': screenCheck, '/done': screenDone, '/records': screenRecords, '/record': screenRecord,
     '/notices': screenNotices, '/notice': screenNotice, '/report': screenReport, '/reports': screenMyReports,
+    '/password': screenPassword, '/me': screenMe,
+    '/status': screenStatus, '/office': screenOffice, '/risks': screenRisks,
   };
   function route() {
     var h = (location.hash || '#/home').slice(1);
@@ -75,42 +81,83 @@
     if (!CFG.API_URL || /여기에/.test(CFG.API_URL)) {
       return view('<div class="card"><h1>설정 필요</h1><p>config.js에 웹 앱 주소(API_URL)를 넣어 주세요.</p></div>');
     }
-    if (path !== '/login' && !empNo()) return go('/login');
-    if (path !== '/login' && path !== '/consent' && state.user && !state.user.consented) return go('/consent');
+    if (path !== '/login' && !token()) return go('/login');
+    if (path !== '/login' && path !== '/password' && state.user && state.user.needChange) return go('/password');
+    if (path !== '/login' && path !== '/consent' && path !== '/password' && state.user && !state.user.consented) return go('/consent');
     if (state.flow && path !== '/check' && path !== '/done') state.flow = null;
     (routes[path] || screenHome)(arg);
   }
   window.addEventListener('hashchange', route);
 
-  // ---------------- 로그인 (사번) ----------------
+  // ---------------- 로그인 (사번 + 비밀번호) ----------------
   function screenLogin() {
     state.user = null; setWho();
-    view('<div class="card"><h1>사번 입력</h1>' +
-      '<p class="hint" style="margin-top:-6px">처음 한 번만 입력하면 이 휴대폰에 기억됩니다.</p>' +
+    view('<div class="card"><h1>로그인</h1>' +
+      '<p class="hint" style="margin-top:-6px">한 번 로그인하면 이 휴대폰에 기억됩니다.</p>' +
       '<form id="f"><label class="lb" for="emp">사번</label>' +
-      '<input id="emp" class="big-input" type="text" inputmode="numeric" autocomplete="off" required>' +
-      '<button class="btn">다음</button></form></div>' +
-      '<p class="hint" style="text-align:center">사번이 등록되어 있지 않으면 안전관리자에게 문의해 주세요.</p>');
-    $('#emp').focus();
+      '<input id="emp" class="big-input" type="text" inputmode="numeric" autocomplete="username" required value="' + esc(empNo()) + '">' +
+      '<label class="lb" for="pw">비밀번호</label>' +
+      '<input id="pw" class="big-input" type="password" inputmode="numeric" autocomplete="current-password" required>' +
+      '<p class="hint">처음에는 비밀번호가 <b>사번과 같습니다.</b></p>' +
+      '<button class="btn">로그인</button></form></div>' +
+      '<p class="hint" style="text-align:center">사번이 없거나 비밀번호를 잊었으면 안전관리자에게 문의해 주세요.</p>');
+    $(empNo() ? '#pw' : '#emp').focus();
     $('#f').onsubmit = function (e) {
       e.preventDefault();
-      var v = $('#emp').value.trim();
-      if (!v) return;
-      setEmpNo(v);
-      api('login', null, { keepError: true }).then(function (res) {
-        if (!res.ok && notOpen(res)) return screenNotOpen(res.error);
-        if (!res.ok) { toast(res.error || '오류가 났습니다.'); setEmpNo(''); return; }
-        view('<div class="card" style="text-align:center"><h1>본인이 맞나요?</h1>' +
-          '<p style="font-size:22px;margin:8px 0"><b>' + esc(res.user.name) + '</b>님</p>' +
-          '<p class="muted" style="margin:0">' + esc(res.user.office) + ' · 사번 ' + esc(res.user.empNo) + '</p>' +
-          '<div class="row2"><button class="btn ghost" id="no">아니요</button><button class="btn" id="yes">예, 맞습니다</button></div></div>');
-        $('#no').onclick = function () { setEmpNo(''); screenLogin(); };
-        $('#yes').onclick = function () {
-          state.user = res.user; setWho();
-          go(res.user.consented ? '/home' : '/consent');
-        };
+      var v = $('#emp').value.trim(), pw = $('#pw').value.trim();
+      if (!v || !pw) return;
+      api('login', { empNo: v, password: pw }, { keepError: true }).then(function (res) {
+        if (!res.ok && notOpen(res)) { setEmpNo(v); return screenNotOpen(res.error); }
+        if (!res.ok) { toast(res.error || '오류가 났습니다.'); $('#pw').value = ''; return; }
+        setEmpNo(v); setToken(res.token);
+        state.user = res.user; setWho();
+        afterLogin();
       });
     };
+  }
+
+  function afterLogin() {
+    var u = state.user;
+    if (u.needChange) return go('/password');
+    if (!u.consented) return go('/consent');
+    go('/home');
+  }
+
+  // 비밀번호 바꾸기 (첫 로그인 때는 반드시)
+  function screenPassword() {
+    var first = !state.user || state.user.needChange;
+    view('<div class="card"><h1>' + (first ? '비밀번호를 새로 정해 주세요' : '비밀번호 바꾸기') + '</h1>' +
+      (first && state.user ? '<p style="font-size:20px;margin:4px 0 0"><b>' + esc(state.user.name) + '</b>님 (' + esc(state.user.office) + ')</p>' +
+        '<p class="hint">처음 비밀번호(사번)는 다른 사람도 알 수 있어서, 바꿔야 TBM을 할 수 있습니다.</p>' : '') +
+      '<form id="f">' + (first ? '' : '<label class="lb" for="cur">지금 비밀번호</label><input id="cur" class="big-input" type="password" inputmode="numeric" autocomplete="current-password" required>') +
+      '<label class="lb" for="n1">새 비밀번호 (숫자 4~6자리)</label><input id="n1" class="big-input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" required>' +
+      '<label class="lb" for="n2">한 번 더 입력</label><input id="n2" class="big-input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" required>' +
+      '<p class="hint">0000, 1234처럼 쉬운 숫자는 쓸 수 없습니다. 잊어버리면 안전관리자에게 초기화를 요청하세요.</p>' +
+      '<button class="btn">' + (first ? '저장하고 시작' : '바꾸기') + '</button></form></div>' +
+      (first ? '<button class="btn ghost" id="out">다른 사번으로 로그인</button>' : '<a class="btn ghost" href="#/me">뒤로</a>'));
+    if ($('#out')) $('#out').onclick = logout;
+    $('#f').onsubmit = function (e) {
+      e.preventDefault();
+      var n1 = $('#n1').value.trim(), n2 = $('#n2').value.trim();
+      if (!/^\d{4,6}$/.test(n1)) return toast('새 비밀번호는 숫자 4~6자리로 정해 주세요.');
+      if (n1 !== n2) { $('#n2').value = ''; return toast('두 번 입력한 비밀번호가 다릅니다.'); }
+      api('changePassword', { newPassword: n1, currentPassword: $('#cur') ? $('#cur').value.trim() : '' }, { keepError: true }).then(function (res) {
+        if (!res.ok) return handleAuthError(res, true);
+        setToken(res.token); state.user = res.user; setWho();
+        toast('비밀번호를 바꿨습니다.', true);
+        first ? afterLogin() : go('/me');
+      });
+    };
+  }
+
+  // 내 정보: 비밀번호 바꾸기, 로그아웃
+  function screenMe() {
+    var u = state.user;
+    if (!u) return api('home', null, { keepError: true }).then(function (res) { if (!res.ok) return handleAuthError(res); state.user = res.user; setWho(); screenMe(); });
+    view('<div class="card"><h1>내 정보</h1><dl class="kv"><dt>성명</dt><dd>' + esc(u.name) + '</dd><dt>소속</dt><dd>' + esc(u.office) + '</dd><dt>사번</dt><dd>' + esc(u.empNo) + '</dd>' +
+      (u.isAdmin ? '<dt>권한</dt><dd>관리자</dd>' : '') + '</dl></div>' +
+      '<a class="btn" href="#/password">비밀번호 바꾸기</a><button class="btn ghost" id="out">이 휴대폰에서 로그아웃</button><a class="btn ghost" href="#/home">홈으로</a>');
+    $('#out').onclick = function () { if (confirm('로그아웃할까요? 다음에 사번과 비밀번호를 다시 넣어야 합니다.')) logout(); };
   }
 
   function screenConsent() {
@@ -123,12 +170,12 @@
       '4. 동의를 거부할 수 있으며, 거부 시 기존 방식(서면)으로 TBM에 참여합니다.</div>' +
       '<label class="check"><input type="checkbox" id="agree"> 위 내용에 동의합니다.</label>' +
       '<button class="btn" id="ok">동의하고 시작</button>' +
-      '<button class="btn ghost" id="other">다른 사번으로 바꾸기</button></div>');
+      '<button class="btn ghost" id="other">다른 사번으로 로그인</button></div>');
     $('#ok').onclick = function () {
       if (!$('#agree').checked) return toast('동의에 체크해 주세요.');
       api('consent').then(function (res) { if (res.ok) { state.user = res.user; setWho(); go('/home'); } });
     };
-    $('#other').onclick = function () { setEmpNo(''); go('/login'); };
+    $('#other').onclick = logout;
   }
 
   // ---------------- 홈 ----------------
@@ -136,6 +183,8 @@
     api('home', null, { keepError: true }).then(function (res) {
       if (!res.ok) return handleAuthError(res);
       state.user = res.user; state.home = res; setWho();
+      if (res.user.needChange) return go('/password');
+      if (res.admin) return adminHome(res);
       if (!res.user.consented) return go('/consent');
       // TBM은 주 1회: 이번 주에 냈으면 완료 표시, 아니면 참여 버튼
       var main, wd = res.weekDone;
@@ -156,8 +205,7 @@
         '<a class="home-btn" href="#/report"><span class="ico">⚠️</span><span>위험·아차사고 보고<small>사진과 함께 바로 알리기</small></span></a>' +
         '<a class="home-btn" href="#/records"><span class="ico">🗂️</span><span>내 TBM 기록<small>최근 30일</small></span></a>' +
         '<a class="home-btn" href="#/reports"><span class="ico">📋</span><span>내 보고 처리 현황<small>보고한 내용과 조치 결과</small></span></a>' +
-        '</div><p style="text-align:center;margin-top:22px"><a href="#" id="switch" class="muted">다른 사번으로 바꾸기</a></p>');
-      $('#switch').onclick = function (e) { e.preventDefault(); if (confirm('이 휴대폰에 저장된 사번을 지울까요?')) { setEmpNo(''); state.user = null; go('/login'); } };
+        '</div><p style="text-align:center;margin-top:22px"><a href="#/me" class="muted">내 정보 · 비밀번호 바꾸기 · 로그아웃</a></p>');
     });
   }
 
@@ -167,14 +215,17 @@
     view('<div class="card" style="text-align:center"><div style="font-size:54px;line-height:1">⏳</div><h1 style="margin-top:12px">아직 시작 전입니다</h1>' +
       '<p style="font-size:20px;margin:8px 0"><b>' + esc(msg) + '</b></p>' +
       '<p class="hint">바탕화면 아이콘은 지금 미리 만들어 두셔도 됩니다.<br>시작하는 날 아이콘을 누르면 바로 들어갈 수 있습니다.</p></div>' +
-      '<button class="btn ghost" id="again">다른 사번으로 바꾸기</button>');
-    $('#again').onclick = function () { setEmpNo(''); screenLogin(); };
+      '<button class="btn ghost" id="again">다른 사번으로 로그인</button>');
+    $('#again').onclick = function () { setToken(''); screenLogin(); };
   }
 
-  function handleAuthError(res) {
+  function handleAuthError(res, toastOnly) {
     if (notOpen(res)) return screenNotOpen(res.error);
-    if (/등록되지 않은|중지된|비어 있/.test(res.error || '')) { toast(res.error); setEmpNo(''); return go('/login'); }
+    if (/다시 로그인|등록되지 않은|중지된|비어 있/.test(res.error || '')) { toast(res.error); setToken(''); return go('/login'); }
+    if (/비밀번호를 바꿔/.test(res.error || '')) { if (state.user) state.user.needChange = true; return go('/password'); }
     if (/동의가 필요/.test(res.error || '')) return go('/consent');
+    if (/관리자만|관리자 계정은/.test(res.error || '')) { toast(res.error); return go('/home'); }
+    if (toastOnly) return toast(res.error || '오류가 났습니다.');
     view('<div class="card"><h1>연결 오류</h1><p>' + esc(res.error) + '</p><button class="btn" onclick="location.reload()">다시 시도</button></div>');
   }
 
@@ -508,6 +559,93 @@
           (r.action ? '<div class="alert ok" style="margin:12px 0 0">조치: ' + esc(r.action) + (r.doneAt ? ' (' + esc(r.doneAt) + ')' : '') + '</div>' : '') + '</div>';
       }).join('') : '<div class="card"><p class="muted">보고한 내용이 없습니다.</p></div>') +
         '<a class="btn orange" href="#/report">새로 보고하기</a><a class="btn ghost" href="#/home">홈으로</a>');
+    });
+  }
+
+
+  // ---------------- 관리자: 권역 현황 ----------------
+  function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
+  function bandCls(p) { return p >= 90 ? 'g' : p >= 50 ? 'y' : 'r'; }
+
+  function adminHome(res) {
+    var p = pct(res.submitted, res.total);
+    view('<div class="adm-title"><h1>' + esc(res.user.office) + '</h1><p class="muted">' + esc(res.user.name) + ' · 관리자</p></div>' +
+      '<a class="card ring-card" href="#/status"><div class="ring" style="--p:' + p + '"><span>' + p + '%</span></div>' +
+      '<div style="flex:1"><div class="muted" style="font-size:15px">권역 전체 제출 현황 · ' + esc(res.week.title.split(' · ')[0]) + '</div>' +
+      '<b style="font-size:21px">' + res.submitted + ' / ' + res.total + '명 제출</b><div class="muted">미제출 ' + (res.total - res.submitted) + '명</div></div><span class="chev">›</span></a>' +
+      '<div class="home-grid">' +
+      '<a class="home-btn" href="#/status"><span class="ico">📊</span><span>권역 현황<small>영업소별 제출률 · 미제출자</small></span></a>' +
+      '<a class="home-btn" href="#/risks"><span class="ico">⚠️</span><span>위험요인 응답<small>건강 지장 · \'아니오\' 응답</small></span>' +
+        (res.risk ? '<span class="count">' + res.risk + '</span>' : '') + '</a>' +
+      '<a class="home-btn" href="#/notices"><span class="ico">📢</span><span>공지사항<small>근무자에게 게시된 공지</small></span>' +
+        (res.unreadNotices ? '<span class="count">' + res.unreadNotices + '</span>' : '') + '</a>' +
+      '<a class="home-btn" href="#/me"><span class="ico">👤</span><span>내 정보<small>비밀번호 바꾸기 · 로그아웃</small></span></a>' +
+      '</div>');
+  }
+
+  function screenStatus() {
+    api('adminSummary', { week: state.adminWeek || '' }, { keepError: true }).then(function (res) {
+      if (!res.ok) return handleAuthError(res);
+      state.adminWeek = res.week.start; state.adminOffices = res.offices;
+      var p = pct(res.submitted, res.total), bands = { r: 0, y: 0, g: 0 };
+      res.offices.forEach(function (o) { bands[bandCls(pct(o.submitted, o.total))]++; });
+      var sort = state.adminSort || 'low';
+      var list = res.offices.slice().sort(sort === 'low'
+        ? function (a, b) { return pct(a.submitted, a.total) - pct(b.submitted, b.total) || (a.office < b.office ? -1 : 1); }
+        : function (a, b) { return a.office < b.office ? -1 : 1; });
+      view('<h1>권역 현황</h1>' +
+        '<select id="wk" class="wk">' + res.weeks.map(function (w) {
+          return '<option value="' + esc(w.start) + '"' + (w.start === res.week.start ? ' selected' : '') + '>' + esc(w.title) + '</option>';
+        }).join('') + (res.weeks.some(function (w) { return w.start === res.week.start; }) ? '' : '<option selected>' + esc(res.week.title) + '</option>') + '</select>' +
+        '<div class="stat-dark"><div><div class="lbl">권역 전체 제출률</div><div class="big">' + p + '%</div>' +
+        '<div class="sub">' + res.submitted + ' / ' + res.total + '명 제출 · ' + (res.week.closed ? '마감됨' : '진행 중') + '</div></div>' +
+        '<div style="text-align:right"><div class="lbl">미제출</div><div class="mid">' + (res.total - res.submitted) + '명</div></div></div>' +
+        '<div class="bands"><span class="r">50% 미만 ' + bands.r + '곳</span><span class="y">50~89% ' + bands.y + '곳</span><span class="g">90% 이상 ' + bands.g + '곳</span></div>' +
+        '<a class="card row-link" href="#/risks"><b>위험요인 응답</b><span><span class="pill">' + res.risk + '명</span><span class="chev">›</span></span></a>' +
+        '<div class="list-head"><b>소속 ' + res.offices.length + '곳</b><div class="seg"><button data-s="low" class="' + (sort === 'low' ? 'on' : '') + '">낮은 순</button>' +
+        '<button data-s="name" class="' + (sort === 'name' ? 'on' : '') + '">이름순</button></div></div>' +
+        '<div class="card" style="padding:0 18px">' + list.map(function (o) {
+          var q = pct(o.submitted, o.total);
+          return '<a class="off-row" href="#/office/' + encodeURIComponent(o.office) + '"><div class="off-top"><b>' + esc(o.office) + '</b><b class="pc ' + bandCls(q) + '">' + q + '%</b></div>' +
+            '<div class="bar"><div class="' + bandCls(q) + '" style="width:' + q + '%"></div></div><div class="muted" style="font-size:15px">' + o.submitted + ' / ' + o.total + '명 제출</div></a>';
+        }).join('') + '</div><a class="btn ghost" href="#/home">홈으로</a>');
+      $('#wk').onchange = function () { state.adminWeek = this.value; screenStatus(); };
+      $all('.seg button').forEach(function (b) { b.onclick = function () { state.adminSort = b.getAttribute('data-s'); screenStatus(); }; });
+    });
+  }
+
+  function screenOffice(office) {
+    api('adminOffice', { week: state.adminWeek || '', office: office }, { keepError: true }).then(function (res) {
+      if (!res.ok) return handleAuthError(res);
+      var p = pct(res.submitted.length, res.total);
+      view('<h1>' + esc(res.office) + '</h1><p class="hint" style="margin-top:-6px">' + esc(res.week.title) + '</p>' +
+        '<div class="stat-dark"><div><div class="lbl">제출률</div><div class="big">' + p + '%</div><div class="sub">' + res.submitted.length + ' / ' + res.total + '명 제출</div></div>' +
+        '<div style="text-align:right"><div class="lbl">미제출</div><div class="mid">' + res.missing.length + '명</div></div></div>' +
+        '<h2>미제출 ' + res.missing.length + '명</h2><div class="card" style="padding:4px 18px">' + (res.missing.length ? res.missing.map(function (m) {
+          return '<div class="list-row"><span><b>' + esc(m.name) + '</b>' + (m.sup ? ' <span class="badge b-blue">관리감독자</span>' : '') + '</span>' +
+            (m.firstUse ? '<span class="badge b-gray">첫 사용 전</span>' : '') + '</div>';
+        }).join('') : '<p class="muted">모두 제출했습니다.</p>') + '</div>' +
+        '<h2>제출 ' + res.submitted.length + '명</h2><div class="card" style="padding:4px 18px">' + (res.submitted.length ? res.submitted.map(function (m) {
+          var badge = m.healthBad ? '<span class="badge b-bad">건강 지장</span>' : m.noCount ? '<span class="badge b-warn">아니오 ' + m.noCount + '</span>' : m.late ? '<span class="badge b-warn">지연</span>' : '<span class="badge b-ok">완료</span>';
+          return '<div class="list-row"><span><b>' + esc(m.name) + '</b>' + (m.sup ? ' <span class="badge b-blue">관리감독자</span>' : '') +
+            '<br><span class="muted" style="font-size:14px">' + esc(m.day) + ' ' + esc(m.shift) + ' · ' + esc(m.time) + '</span></span>' + badge + '</div>';
+        }).join('') : '<p class="muted">아직 제출한 사람이 없습니다.</p>') + '</div>' +
+        '<a class="btn" href="#/status">권역 현황으로</a>');
+    });
+  }
+
+  function screenRisks() {
+    api('adminRisks', { week: state.adminWeek || '' }, { keepError: true }).then(function (res) {
+      if (!res.ok) return handleAuthError(res);
+      view('<h1>위험요인 응답</h1><p class="hint" style="margin-top:-6px">' + esc(res.week.title) + ' · 건강 \'지장 있음\' 또는 점검 \'아니오\'</p>' +
+        (res.items.length ? res.items.map(function (r) {
+          return '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px"><b>' + esc(r.name) + ' · ' + esc(r.office) + '</b>' +
+            (r.healthBad ? '<span class="badge b-bad">건강 지장</span>' : '<span class="badge b-warn">아니오 ' + r.noCount + '</span>') + '</div>' +
+            '<p class="muted" style="margin:4px 0;font-size:14px">' + esc(r.day) + ' ' + esc(r.shift) + ' · ' + esc(r.time) + ' 제출</p>' +
+            (r.noText ? '<div class="notice-body" style="font-size:15px">' + esc(r.noText) + '</div>' : '') +
+            (r.remarks ? '<div class="alert info" style="margin:10px 0 0;font-size:15px">특이사항: ' + esc(r.remarks) + '</div>' : '') + '</div>';
+        }).join('') : '<div class="card"><p class="muted">이 주에는 위험요인 응답이 없습니다.</p></div>') +
+        '<a class="btn" href="#/status">권역 현황으로</a><a class="btn ghost" href="#/home">홈으로</a>');
     });
   }
 
