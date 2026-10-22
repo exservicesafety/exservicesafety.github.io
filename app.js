@@ -90,6 +90,7 @@
     '/notices': screenNotices, '/notice': screenNotice, '/report': screenReport, '/reports': screenMyReports,
     '/password': screenPassword, '/me': screenMe,
     '/status': screenStatus, '/office': screenOffice, '/risks': screenRisks,
+    '/off': screenOff,
     '/manage': screenManage, '/periods': screenPeriods, '/staff': screenStaff, '/staffadd': screenStaffAdd, '/staffone': screenStaffOne,
   };
   function route() {
@@ -227,10 +228,14 @@
           esc(fmtDate(wd.workDate)) + ' ' + esc(wd.shift) + ' · ' + esc(wd.submittedAt.slice(11, 16)) + ' 제출 · 눌러서 내용 보기</small></span></a>' +
           '<p class="hint" style="text-align:center;margin:-4px 0 0">' + (daily ? '내일 출근하면 다시 참여합니다'
             : '이번 주 ' + esc(res.weekLabel) + ' · 다음 주 월요일부터 다시 참여합니다') + '</p>';
+      } else if (res.offToday) {
+        main = '<a class="home-btn off" href="#/tbm"><span class="ico">🏖️</span><span>오늘은 ' + esc(rlabel(res.offToday.reason)) + '(으)로 등록됨' +
+          '<small>' + esc(res.weekLabel) + ' · 출근했다면 눌러서 TBM 참여</small></span></a>';
       } else {
         main = '<a class="home-btn main" href="#/tbm"><span class="ico">✅</span><span>' + unit + ' TBM 참여<small>' +
           esc(res.weekLabel) + ' · 아직 참여하지 않았습니다</small></span></a>';
       }
+      if (res.canOff) main += '<a class="home-btn" href="#/off"><span class="ico">🗓️</span><span>쉬는 날 등록<small>휴무·연차·휴직 (앞뒤 7일)</small></span></a>';
       if (res.user.isManager) main += '<a class="home-btn" href="#/manage"><span class="ico">📝</span><span>소속 관리 (미리 보기)<small>' +
         esc(fmtDate(res.dailyFrom || '')) + '부터 관리감독자는 TBM 대신 이 화면을 씁니다</small></span></a>';
       var recent = res.recent.length ? '<div class="card" style="margin:0;padding:14px 18px"><b style="font-size:16px">최근 제출</b><ul class="recent">' +
@@ -769,6 +774,76 @@
       '<a class="btn ghost" href="#/status">권역 현황으로</a>');
   }
 
+  // ---------------- 근무자: 쉬는 날 등록 (앞뒤 7일, 등록하면 바로 인정) ----------------
+  function rlabel(r) { return r === '비번·휴무' ? '휴무' : r; }
+
+  function screenOff() {
+    api('myOff', null, { keepError: true }).then(function (res) {
+      if (!res.ok) return handleAuthError(res);
+      var byDay = {}, picked = {}, reason = null;
+      res.days.forEach(function (x) { byDay[x.d] = x; });
+      // 달력: 첫 날이 속한 주 월요일 ~ 마지막 날이 속한 주 일요일
+      var first = res.days[0].d, last = res.days[res.days.length - 1].d;
+      var dow = function (d) { var p = d.split('-').map(Number); return (new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay() + 6) % 7; };
+      var start = addDays(first, -dow(first)), end = addDays(last, 6 - dow(last));
+      var cells = '';
+      for (var d = start; d <= end; d = addDays(d, 1)) {
+        var x = byDay[d], num = Number(d.slice(8)), cls = 'cd', tag = '';
+        if (!x || !x.open) cls += ' no';
+        else if (x.done) { cls += ' done'; tag = 'TBM'; }
+        else if (x.reason) { cls += ' rs'; tag = esc(rlabel(x.reason)).slice(0, 2); }
+        else cls += ' free';
+        if (x && x.today) cls += ' today';
+        cells += '<button type="button" class="' + cls + '" data-d="' + d + '"' + (cls.indexOf('free') < 0 ? ' disabled' : '') + '>' +
+          '<b>' + (num === 1 || d === start ? Number(d.slice(5, 7)) + '/' : '') + num + '</b><small>' + (x && x.today && !tag ? '오늘' : tag) + '</small></button>';
+      }
+      var mine = res.days.filter(function (x) { return x.reason; });
+      view('<h1>쉬는 날 등록</h1><p class="hint" style="margin-top:-6px">쉬는 날을 눌러 고르고 사유를 저장하세요. ' + esc(fmtDate(res.from)) + ' ~ ' + esc(fmtDate(res.to)) +
+        '까지만 됩니다.<br>병가·장기 휴직은 <b>소장님</b>께 말씀하세요.</p>' +
+        '<div class="card cal-card"><div class="cal">' + ['월', '화', '수', '목', '금', '토', '일'].map(function (w) { return '<span class="wd">' + w + '</span>'; }).join('') + cells + '</div>' +
+        '<p class="legend" style="margin-top:8px"><span class="o">TBM</span> 한 날 · <span class="rs">휴무</span> 등록된 날 · 회색은 등록 불가</p></div>' +
+        '<div class="card"><b>사유</b><div class="chips" id="rs" style="margin-top:10px">' + res.reasons.map(function (r) {
+          return '<button type="button" data-r="' + esc(r) + '">' + esc(rlabel(r)) + '</button>';
+        }).join('') + '</div><button class="btn orange" id="save" disabled>날짜를 먼저 고르세요</button></div>' +
+        '<h2>등록한 날 ' + mine.length + '일</h2><div class="card" style="padding:4px 18px">' + (mine.length ? mine.map(function (x) {
+          return '<div class="list-row"><span><b>' + esc(x.label) + '</b> <span class="badge b-blue">' + esc(rlabel(x.reason)) + '</span>' +
+            (!x.self ? '<br><span class="muted" style="font-size:14px">소장님이 넣은 사유' + (x.long ? ' (기간)' : '') + '</span>' : '') + '</span>' +
+            (x.canCancel ? '<button class="mini" data-cancel="' + esc(x.id) + '" data-label="' + esc(x.label) + '">취소</button>' : '') + '</div>';
+        }).join('') : '<p class="muted">없습니다.</p>') + '</div><a class="btn ghost" href="#/home">홈으로</a>');
+      function refresh() {
+        var n = Object.keys(picked).length, btn = $('#save');
+        btn.disabled = !n;
+        btn.textContent = !n ? '날짜를 먼저 고르세요' : !reason ? n + '일 · 사유를 고르세요' : n + '일을 "' + rlabel(reason) + '"(으)로 저장';
+      }
+      $all('.cd.free').forEach(function (b) {
+        b.onclick = function () {
+          var d = b.getAttribute('data-d');
+          if (picked[d]) delete picked[d]; else picked[d] = true;
+          b.classList.toggle('on', !!picked[d]); refresh();
+        };
+      });
+      $all('#rs button').forEach(function (b) {
+        b.onclick = function () { $all('#rs button').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); reason = b.getAttribute('data-r'); refresh(); };
+      });
+      $('#save').onclick = function () {
+        var dates = Object.keys(picked).sort();
+        if (!dates.length) return toast('날짜를 골라 주세요.');
+        if (!reason) return toast('사유를 골라 주세요.');
+        api('myOffSet', { dates: dates, reason: reason }, { text: '저장하고 있습니다' }).then(function (r) {
+          if (!r.ok) return;
+          state.home = null;
+          toast(r.added + '일을 등록했습니다.', true); screenOff();
+        });
+      };
+      $all('[data-cancel]').forEach(function (b) {
+        b.onclick = function () {
+          if (!confirm(b.getAttribute('data-label') + ' 쉬는 날 등록을 취소할까요?')) return;
+          api('myOffCancel', { id: b.getAttribute('data-cancel') }).then(function (r) { if (r.ok) { state.home = null; toast('취소했습니다.', true); screenOff(); } });
+        };
+      });
+    });
+  }
+
   // ---------------- 관리감독자: 소속 관리 (매일 TBM) ----------------
   // 관리자는 주소 뒤에 소속 이름이 붙는다 (#/manage/대전영업소), 관리감독자는 자기 소속만
   function mgrOffice(arg) { return state.user && state.user.isAdmin ? arg : ''; }
@@ -822,8 +897,8 @@
       html += '<h2>' + (isToday ? '아직 안 한 사람' : 'TBM 안 한 사람') + ' ' + waiting.length + '명</h2>';
       if (waiting.length) {
         html += '<p class="hint" style="margin:-6px 0 10px">' + (isToday
-          ? '오늘 쉬는 사람(비번·연차 등)만 눌러 고른 뒤 사유를 저장하세요. 출근할 사람은 그대로 두면 됩니다.'
-          : '쉬었던 사람을 골라 사유를 저장하세요. 사유가 없으면 <b>미실시</b>로 남습니다.') + '</p>' +
+          ? '근무자가 쉬는 날을 직접 등록하지 않았을 때만 골라서 사유를 저장하세요. 출근할 사람은 그대로 두면 됩니다.'
+          : '쉬었는데 등록을 안 한 사람만 골라 사유를 저장하세요. 사유가 없으면 <b>미실시</b>로 남습니다.') + '</p>' +
           '<div class="card sel-card">' + (ro ? '' : '<label class="sel-row all"><input type="checkbox" id="selAll"><span>전체 선택</span></label>') +
           waiting.map(function (x) {
             return '<label class="sel-row"><input type="checkbox" class="pick" value="' + esc(x.empNo) + '"' + (ro ? ' disabled' : '') + '><span><b>' + esc(x.name) + '</b>' +
@@ -839,9 +914,9 @@
       }
       // 2) 사유 입력됨
       html += '<h2>사유 입력됨 ' + excused.length + '명</h2><div class="card" style="padding:4px 18px">' + (excused.length ? excused.map(function (x) {
-        return '<div class="list-row"><span><b>' + esc(x.name) + '</b> <span class="badge b-blue">' + esc(x.reason) + '</span>' +
+        return '<div class="list-row"><span><b>' + esc(x.name) + '</b> <span class="badge b-blue">' + esc(x.reason) + '</span>' + (x.self ? ' <span class="badge b-gray">본인 등록</span>' : '') +
           (x.absFrom !== x.absTo ? '<br><span class="muted" style="font-size:14px">' + esc(fmtDate(x.absFrom)) + ' ~ ' + esc(fmtDate(x.absTo)) + ' (기간)</span>' : '') +
-          (x.memo ? '<br><span class="muted" style="font-size:14px">' + esc(x.memo) + '</span>' : '') + '</span>' +
+          (x.memo && x.memo !== '본인 등록' ? '<br><span class="muted" style="font-size:14px">' + esc(x.memo) + '</span>' : '') + '</span>' +
           (x.canCancel && !ro ? '<button class="mini" data-cancel="' + esc(x.absId) + '" data-name="' + esc(x.name) + '" data-reason="' + esc(x.reason) + '">취소</button>' : '') + '</div>';
       }).join('') : '<p class="muted">없습니다.</p>') + '</div>';
       // 3) 제출한 사람 (건강 지장·아니오는 내용까지)

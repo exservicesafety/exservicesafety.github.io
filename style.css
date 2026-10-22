@@ -227,3 +227,19 @@ input[type=date] { width: 100%; font: inherit; padding: 13px 14px; border: 1.5px
 .home-btn.has-count { padding-right: 58px; }
 .stat-dark .mid { white-space: nowrap; }
 .wk-grid td.c.o, .wk-grid td.c.x { font-size: 19px; }
+
+/* 근무자: 쉬는 날 등록 달력 */
+.home-btn.off { background: #5f6b7a; color: #fff; }
+.home-btn.off small { color: #fff; opacity: .92; }
+.cal-card { padding: 14px 10px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal .wd { text-align: center; font-size: 14px; font-weight: 700; color: var(--muted); }
+.cal .cd { font: inherit; border: 2px solid var(--line); background: #fff; border-radius: 12px; min-height: 58px; padding: 4px 0; color: var(--text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; -webkit-tap-highlight-color: transparent; }
+.cal .cd b { font-size: 18px; line-height: 1.1; }
+.cal .cd small { font-size: 12px; font-weight: 700; min-height: 14px; color: var(--muted); }
+.cal .cd.no { background: #eef1f5; border-color: #eef1f5; color: #b5bdc8; }
+.cal .cd.done { background: #e6f4ea; border-color: #e6f4ea; } .cal .cd.done small { color: var(--green); }
+.cal .cd.rs { background: #e8f0fe; border-color: #e8f0fe; } .cal .cd.rs small { color: #174ea6; }
+.cal .cd.today { border-color: var(--navy); }
+.cal .cd.on { background: var(--orange); border-color: var(--orange); color: #fff; } .cal .cd.on small { color: #fff; }
