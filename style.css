@@ -181,3 +181,49 @@ select.wk { margin-bottom: 14px; font-size: 18px; }
   html, body { background: var(--bg); color: var(--text); }
   .card, .q, .home-btn { background: var(--card); color: var(--text); }
 }
+
+/* 관리감독자: 소속 관리 (매일 TBM) */
+.date-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--card); border-radius: var(--radius);
+  padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 10px; }
+.date-nav > div { text-align: center; font-size: 22px; line-height: 1.2; }
+.date-nav small { display: block; font-size: 14px; color: var(--muted); font-weight: 600; }
+.date-nav button { font: inherit; font-size: 16px; font-weight: 700; border: 1.5px solid var(--navy); background: #fff; color: var(--navy);
+  border-radius: 12px; padding: 10px 12px; min-height: 48px; }
+.date-nav button:disabled { border-color: var(--line); color: #b5bdc8; }
+.btn.slim { min-height: 46px; margin: 0 0 10px; }
+.sum4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 18px; }
+.sum4 > div { background: var(--card); border-radius: 12px; padding: 10px 4px; text-align: center; font-size: 14px; color: var(--muted); font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.sum4 b { display: block; font-size: 26px; color: var(--text); line-height: 1.2; }
+.sum4 .g b { color: var(--green); } .sum4 .b b { color: #174ea6; } .sum4 .r b { color: var(--red); }
+.sel-card { padding: 4px 14px; }
+.sel-row { display: flex; align-items: center; gap: 12px; padding: 14px 6px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 19px;
+  -webkit-tap-highlight-color: transparent; border-radius: 10px; }
+.sel-row:last-child { border-bottom: 0; }
+.sel-row > span { flex: 1; }
+.sel-row input { width: 28px; height: 28px; flex: none; accent-color: var(--orange); }
+.sel-row.on { background: #fff3e6; }
+.sel-row.all { font-size: 16px; font-weight: 700; color: var(--muted); }
+.mini { font: inherit; font-size: 15px; font-weight: 700; border: 1.5px solid var(--navy); background: #fff; color: var(--navy); border-radius: 10px;
+  padding: 8px 14px; white-space: nowrap; }
+.mini.red { border-color: var(--red); color: var(--red); }
+.btns { display: flex; gap: 6px; flex: none; }
+.list-row.col { display: block; }
+.lr-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+input[type=date] { width: 100%; font: inherit; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--field); min-height: 54px; }
+
+/* 관리자: 소속 주간 표 */
+.wk-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 15px; }
+.wk-grid th { font-size: 14px; color: var(--muted); font-weight: 700; padding: 4px 0 8px; line-height: 1.2; }
+.wk-grid th small { font-weight: 500; }
+.wk-grid th.nm, .wk-grid td.nm { width: 78px; text-align: left; padding-left: 6px; }
+.wk-grid td { border-top: 1px solid var(--line); padding: 8px 0; text-align: center; }
+.wk-grid td.nm { font-weight: 700; font-size: 15px; line-height: 1.25; word-break: keep-all; }
+.wk-grid td.c { font-weight: 800; }
+.o { color: var(--green); } .o.bad { color: #b06000; } .x { color: var(--red); } .rs { color: #174ea6; font-size: 12px; font-weight: 700; } .w { color: var(--muted); }
+.wk-grid td.x { background: #fce8e6; }
+.legend { font-size: 13px; color: var(--muted); margin: 10px 4px 0; }
+.legend span { font-weight: 800; margin-left: 6px; }
+.home-btn.has-count { padding-right: 58px; }
+.stat-dark .mid { white-space: nowrap; }
+.wk-grid td.c.o, .wk-grid td.c.x { font-size: 19px; }
