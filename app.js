@@ -1104,7 +1104,7 @@
       (x.until ? '<p style="margin:0">퇴사 예정: <b>' + esc(fmtDate(x.until)) + '</b>까지 근무</p><button class="btn ghost" id="undo">퇴사 취소</button>'
         : '<label class="lb" for="qdt" style="margin-top:4px">마지막 근무일</label><input type="date" id="qdt" value="' + esc(today) + '"' + (res.minDate ? ' min="' + esc(res.minDate) + '"' : '') + '>' +
           '<p class="hint">다음 날부터 로그인할 수 없고 TBM 대상에서 빠집니다.</p><button class="btn red" id="quit">퇴사 처리</button>') + '</div>' +
-      (x.canReset ? '<div class="card"><h2 style="margin-bottom:6px">🔑 비밀번호 초기화</h2><p class="hint" style="margin:0">비밀번호가 사번으로 돌아갑니다. 5번 틀려 잠긴 경우에도 바로 풀립니다.</p>' +
+      (x.canReset ? '<div class="card"><h2 style="margin-bottom:6px">🔑 비밀번호 초기화</h2><p class="hint" style="margin:0">비밀번호가 사번으로 돌아갑니다. 다음 로그인 때 새로 정합니다.</p>' +
         '<button class="btn ghost" id="reset">초기화</button></div>' : '') +
       '<a class="btn ghost" href="' + staffBack() + '">직원 목록으로</a>');
     var back = function (msg) { toast(msg, true); location.hash = staffBack(); };
