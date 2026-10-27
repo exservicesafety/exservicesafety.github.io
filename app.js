@@ -985,7 +985,7 @@
             (!ro && it.canCancel ? '<button class="mini red" data-cancel="' + esc(it.id) + '" data-name="' + esc(it.name) + '">취소</button>' : '') + '</span></div>';
         }).join('') : '<p class="muted">없습니다.</p>') + '</div>';
       if (!ro) {
-        html += '<h2>새로 넣기</h2><div class="card"><label class="lb" for="who" style="margin-top:0">누구</label><select id="who"><option value="">이름을 고르세요</option>' +
+        html += '<h2>새로 넣기</h2><div class="card"><label class="lb" for="pwho" style="margin-top:0">누구</label><select id="pwho"><option value="">이름을 고르세요</option>' +
           res.people.map(function (x) { return '<option value="' + esc(x.empNo) + '">' + esc(x.name) + '</option>'; }).join('') + '</select>' +
           '<label class="lb">사유</label><div class="chips" id="rs">' + res.reasons.map(function (r) {
             return '<button type="button" data-r="' + esc(r) + '"' + (r === reason ? ' class="on"' : '') + '>' + esc(r) + '</button>';
@@ -1002,11 +1002,11 @@
       });
       if ($('#from')) $('#from').onchange = function () { if ($('#to').value < this.value) $('#to').value = this.value; };
       if ($('#save')) $('#save').onclick = function () {
-        var who = $('#who').value, from = $('#from').value, to = $('#to').value;
+        var who = $("#pwho").value, from = $('#from').value, to = $('#to').value;
         if (!who) return toast('이름을 골라 주세요.');
         if (!from || !to) return toast('날짜를 넣어 주세요.');
         if (to < from) return toast('마지막 날이 시작일보다 앞입니다.');
-        var name = $('#who').selectedOptions[0].textContent;
+        var name = $("#pwho").selectedOptions[0].textContent;
         if (!confirm(name + '님\n' + reason + ' · ' + fmtDate(from) + ' ~ ' + fmtDate(to) + '\n저장할까요?')) return;
         api('mgrAbsence', { office: office, empNo: who, reason: reason, from: from, to: to, memo: $('#memo').value }, { text: '저장하고 있습니다' }).then(function (r) {
           if (!r.ok) return;
