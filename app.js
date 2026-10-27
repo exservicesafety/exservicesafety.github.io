@@ -1043,7 +1043,8 @@
         (res.readOnly ? '<div class="alert warn">시연 계정: 보기만 할 수 있습니다.</div>' : '<a class="btn orange" href="#/staffadd" style="margin:0 0 14px">＋ 직원 등록 (입사·전입)</a>') +
         '<div class="card" style="padding:4px 18px">' + res.items.map(function (x) {
           var tags = (x.sup ? ' <span class="badge b-blue">관리감독자</span>' : '') + (x.job ? ' <span class="badge b-gray">' + esc(x.job) + '</span>' : '') +
-            (x.until ? ' <span class="badge b-bad">퇴사 ' + esc(fmtDate(x.until)) + '</span>' : '');
+            (x.until ? ' <span class="badge b-bad">퇴사 ' + esc(fmtDate(x.until)) + '</span>' : '') +
+            (x.move ? ' <span class="badge b-warn">' + esc(fmtDate(x.move.date)) + ' ' + esc(x.move.to) + '(으)로 이동 예정</span>' : '');
           var sub = esc(x.empNo) + (x.since ? ' · ' + esc(fmtDate(x.since)) + ' 등록' : '') + (x.firstUse ? ' · 첫 사용 전' : !x.pwSet ? ' · 비밀번호 = 사번' : '');
           return x.canEdit
             ? '<a class="list-row" href="#/staffone/' + esc(x.empNo) + '"><span><b>' + esc(x.name) + '</b>' + tags + '<br><span class="muted" style="font-size:14px">' + sub + '</span></span><span class="chev">›</span></a>'
@@ -1097,9 +1098,12 @@
     var today = res.today;
     view('<h1>' + esc(x.name) + '</h1><p class="hint" style="margin-top:-6px">' + esc(res.office) + ' · 사번 ' + esc(x.empNo) + '</p>' +
       '<div class="card"><h2 style="margin-bottom:6px">🔀 다른 소속으로 이동 (전출)</h2>' +
-      '<select id="to"><option value="">옮겨 갈 소속을 고르세요</option>' + res.offices.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select>' +
-      '<label class="lb" for="tdt">이동일 (새 소속 첫 근무일)</label><input type="date" id="tdt" value="' + esc(today) + '" max="' + esc(today) + '"' + (res.minDate ? ' min="' + esc(res.minDate) + '"' : '') + '>' +
-      '<button class="btn" id="move">이동</button></div>' +
+      (x.move ? '' : '<select id="to"><option value="">옮겨 갈 소속을 고르세요</option>' + res.offices.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select>') +
+      (x.move ? '<div class="alert warn" style="margin:0 0 10px">' + esc(fmtDate(x.move.date)) + '에 <b>' + esc(x.move.to) + '</b>(으)로 이동 예약됨</div>' +
+        '<button class="btn ghost" id="mvcancel" style="margin-top:0">이동 예약 취소</button>' :
+      '<label class="lb" for="tdt">이동일 (새 소속 첫 근무일)</label><input type="date" id="tdt" value="' + esc(today) + '"' + (res.isAdmin ? '' : ' max="' + esc(today) + '"') + (res.minDate ? ' min="' + esc(res.minDate) + '"' : '') + '>' +
+      (res.isAdmin ? '<p class="hint">앞날을 넣으면 <b>이동 예약</b>이 되고, 그날 자동으로 소속이 바뀝니다.</p>' : '') +
+      '<button class="btn" id="move">이동</button>') + '</div>' +
       '<div class="card"><h2 style="margin-bottom:6px">👋 퇴사</h2>' +
       (x.until ? '<p style="margin:0">퇴사 예정: <b>' + esc(fmtDate(x.until)) + '</b>까지 근무</p><button class="btn ghost" id="undo">퇴사 취소</button>'
         : '<label class="lb" for="qdt" style="margin-top:4px">마지막 근무일</label><input type="date" id="qdt" value="' + esc(today) + '"' + (res.minDate ? ' min="' + esc(res.minDate) + '"' : '') + '>' +
@@ -1108,11 +1112,18 @@
         '<button class="btn ghost" id="reset">초기화</button></div>' : '') +
       '<a class="btn ghost" href="' + staffBack() + '">직원 목록으로</a>');
     var back = function (msg) { toast(msg, true); location.hash = staffBack(); };
-    $('#move').onclick = function () {
+    if ($('#move')) $('#move').onclick = function () {
       var to = $('#to').value, d = $('#tdt').value;
       if (!to) return toast('옮겨 갈 소속을 골라 주세요.');
-      if (!confirm(x.name + '님을\n' + to + '(으)로 옮길까요? (' + fmtDate(d) + '부터)')) return;
-      api('mgrTransfer', { office: office, empNo: x.empNo, toOffice: to, date: d }).then(function (r) { if (r.ok) back(r.name + '님을 ' + r.toOffice + '(으)로 옮겼습니다.'); });
+      var later = d > today;
+      if (!confirm(x.name + '님을\n' + to + '(으)로 ' + (later ? fmtDate(d) + '에 옮기도록 예약할까요?' : '옮길까요? (' + fmtDate(d) + '부터)'))) return;
+      api('mgrTransfer', { office: office, empNo: x.empNo, toOffice: to, date: d }).then(function (r) {
+        if (r.ok) back(r.reserved ? r.name + '님 이동을 예약했습니다. ' + fmtDate(r.date) + '에 자동으로 바뀝니다.' : r.name + '님을 ' + r.toOffice + '(으)로 옮겼습니다.');
+      });
+    };
+    if ($('#mvcancel')) $('#mvcancel').onclick = function () {
+      if (!confirm(x.name + '님 이동 예약을 취소할까요?')) return;
+      api('mgrMoveCancel', { office: office, empNo: x.empNo }).then(function (r) { if (r.ok) back('이동 예약을 취소했습니다.'); });
     };
     if ($('#quit')) $('#quit').onclick = function () {
       var d = $('#qdt').value;
